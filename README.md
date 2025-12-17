@@ -26,12 +26,18 @@ BUTTONS:
 Arduino Pin 2  ←→ Microphone Button ←→ GND
 Arduino Pin 3  ←→ Audio Button ←→ GND
 
+<<<<<<< HEAD
 LEDs:
 Arduino Pin 12 ←→ Mic LED anode ←→ 220Ω resistor ←→ GND
 Arduino Pin 13 ←→ Audio LED anode ←→ 220Ω resistor ←→ GND
 
 Common GND for all components
 ```
+=======
+<img width="1480" height="841" alt="Image" src="https://github.com/user-attachments/assets/93f88a02-26d8-4cb8-9619-c8a0a7c90b57" />
+
+For more information, see the wiring_diagram.pdf included in the project root (detailed Arduino connection diagram).
+>>>>>>> 7e205f6 (update readme file)
 
 ## Installation
 
@@ -175,3 +181,27 @@ AUDIO:OFF               // Turn off audio LED
 - **Server**: Python 3.7+
 - **Arduino Sketch**: v1.0
 - **Arduino**: Uno/Nano (compatible)
+
+## License
+
+  [MIT License](https://choosealicense.com/licenses/mit/)
+
+Copyright (c) 2024 Francesco
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
