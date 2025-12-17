@@ -21,23 +21,10 @@ BetterDiscord Plugin
 - **LED 2 (Audio)**: Pin 13 (HIGH = audio muted)
 
 ### Wiring Diagram
-```
-BUTTONS:
-Arduino Pin 2  ←→ Microphone Button ←→ GND
-Arduino Pin 3  ←→ Audio Button ←→ GND
 
-<<<<<<< HEAD
-LEDs:
-Arduino Pin 12 ←→ Mic LED anode ←→ 220Ω resistor ←→ GND
-Arduino Pin 13 ←→ Audio LED anode ←→ 220Ω resistor ←→ GND
-
-Common GND for all components
-```
-=======
 <img width="1480" height="841" alt="Image" src="https://github.com/user-attachments/assets/93f88a02-26d8-4cb8-9619-c8a0a7c90b57" />
 
 For more information, see the wiring_diagram.pdf included in the project root (detailed Arduino connection diagram).
->>>>>>> 7e205f6 (update readme file)
 
 ## Installation
 
