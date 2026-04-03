@@ -62,30 +62,33 @@ void setup() {
 }
 
 void loop() {
-  // Handle commands from Python server
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
     command.trim();
-    
-    // Process LED control commands from server
-    if (command.startsWith("MIC:ON")) {
-      ledMicState = true;
-      digitalWrite(LED_MIC_PIN, HIGH);
-    }
-    else if (command.startsWith("MIC:OFF")) {
-      ledMicState = false;
-      digitalWrite(LED_MIC_PIN, LOW);
-    }
-    else if (command.startsWith("AUDIO:ON")) {
-      ledAudioState = true;
-      digitalWrite(LED_AUDIO_PIN, HIGH);
-    }
-    else if (command.startsWith("AUDIO:OFF")) {
-      ledAudioState = false;
-      digitalWrite(LED_AUDIO_PIN, LOW);
+
+    // Usiamo il primo carattere per lo switch
+    switch (command[0]) { 
+      case 'M': // Potrebbe essere MIC:ON o MIC:OFF
+        if (command.endsWith("ON")) {
+          ledMicState = true;
+          digitalWrite(LED_MIC_PIN, HIGH);
+        } else {
+          ledMicState = false;
+          digitalWrite(LED_MIC_PIN, LOW);
+        }
+        break;
+
+      case 'A': // Potrebbe essere AUDIO:ON o AUDIO:OFF
+        if (command.endsWith("ON")) {
+          ledAudioState = true;
+          digitalWrite(LED_AUDIO_PIN, HIGH);
+        } else {
+          ledAudioState = false;
+          digitalWrite(LED_AUDIO_PIN, LOW);
+        }
+        break;
     }
   }
-  
   // Process microphone button press with debouncing
   if (buttonMicPressed) {
     unsigned long currentTime = millis();
