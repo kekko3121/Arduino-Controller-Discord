@@ -38,12 +38,14 @@ class SerialInterface:
             logger.error(f"Error opening port: {e}") # Log any exceptions that occur during connection attempt
             return False
 
+    # Method to write data to the Arduino. It checks if the connection is open before attempting to write, and sends the data 
+    # followed by a newline character.
     def write(self, data):
         if self.conn and self.conn.is_open:
             self.conn.write(f"{data}\n".encode())
 
+    # Method to read a complete line from the Arduino, buffering incomplete data until a newline character is received. It checks if the
     def read_line(self):
-        """Legge una linea completa da Arduino, bufferizzando i dati incompleti"""
         if not self.conn or not self.conn.is_open:
             return None
         
@@ -66,11 +68,12 @@ class SerialInterface:
     def is_connected(self):
         return self.conn is not None and self.conn.is_open
 
+    # Method to send a list of commands to the Arduino by writing each command to the serial connection
     def send_commands(self, commands):
-        """Invia una lista di comandi all'Arduino"""
         for command in commands:
             self.write(command)
-    
+
+    # Method to close the serial connection if it is open, and log a message indicating that the connection has been closed
     def close(self):
         if self.conn and self.conn.is_open:
             self.conn.close()

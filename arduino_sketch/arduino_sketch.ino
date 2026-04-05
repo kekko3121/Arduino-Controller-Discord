@@ -63,12 +63,12 @@ void setup() {
 
 void loop() {
   if (Serial.available()) {
-    String command = Serial.readStringUntil('\n');
-    command.trim();
+    String command = Serial.readStringUntil('\n'); // Read incoming command until newline
+    command.trim(); // Remove any leading/trailing whitespace
 
-    // Usiamo il primo carattere per lo switch
-    switch (command[0]) { 
-      case 'M': // Potrebbe essere MIC:ON o MIC:OFF
+    // Use the first character to determine command type, then check the full string for ON/OFF
+    switch (command[0]) {
+      case 'M': // Could be MIC:ON or MIC:OFF
         if (command.endsWith("ON")) {
           ledMicState = true;
           digitalWrite(LED_MIC_PIN, HIGH);
@@ -78,7 +78,7 @@ void loop() {
         }
         break;
 
-      case 'A': // Potrebbe essere AUDIO:ON o AUDIO:OFF
+      case 'A': // Could be AUDIO:ON or AUDIO:OFF
         if (command.endsWith("ON")) {
           ledAudioState = true;
           digitalWrite(LED_AUDIO_PIN, HIGH);

@@ -13,18 +13,20 @@ class WebSocket:
         self.bridge = bridge # Instance of CommandBridge to handle command translation between Arduino and Discord
         self.state = state_manager # Instance of AudioState to manage current mute/deafen states
         self.clients = set() # Set to track connected WebSocket clients for broadcasting state updates
-    
+
+    # Start the WebSocket server and keep it running indefinitely
     async def start(self):
         """Inizia il server WebSocket e lo tiene in esecuzione"""
         logger.info(f"Server avviato su ws://{SERVER_CONFIG['host']}:{SERVER_CONFIG['port']}")
         
-        # websockets.serve crea il server e usa handle_client per ogni nuova connessione
+        # Serve the WebSocket server using the handle_client method to manage incoming connections and messages, and keep it 
+        # running indefinitely with asyncio.Future() to prevent the server from exiting.
         async with websockets.serve(
             self.handle_client, 
             SERVER_CONFIG['host'], 
             SERVER_CONFIG['port']
         ):
-            # Questo mantiene il server attivo indefinitamente
+            # Keep the server running indefinitely
             await asyncio.Future()
 
     # Broadcast a message to all connected clients
@@ -32,7 +34,7 @@ class WebSocket:
         if not self.clients:
             return
         
-        message = json.dumps(data)
+        message = json.dumps(data) # Convert the data to a JSON string for transmission to clients
 
         # Use asyncio.gather to send the message to all clients concurrently, handling any exceptions that may occur
         await asyncio.gather(*[client.send(message) for client in self.clients], return_exceptions=True)

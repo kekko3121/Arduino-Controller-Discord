@@ -11,11 +11,14 @@ module.exports = class ArduinoMute {
     this.VoiceActions = null;
     this.VoiceStateStore = null;
     this.ws = null;
-    this.SERVER_URL = "ws://localhost:8765";
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
-    this.reconnectDelay = 2000;
     
+    // Configuration constants
+    this.SERVER_URL = "ws://localhost:8765";
+    this.STATE_UPDATE_DELAY = 100;
+    this.RECONNECT_DELAY = 2000;
+    this.MAX_RECONNECT_ATTEMPTS = 10;
+    
+    this.reconnectAttempts = 0;
     this.micMuted = false;
     this.audioDeafened = false;
   }
@@ -42,61 +45,40 @@ module.exports = class ArduinoMute {
   }
 
   updateCurrentState() {
-    // Try to read state from VoiceStateStore
-    if (this.VoiceStateStore) {
-      try {
-        if (typeof this.VoiceStateStore.isSelfMute === "function") {
-          this.micMuted = this.VoiceStateStore.isSelfMute();
-        }
-        if (typeof this.VoiceStateStore.isSelfDeaf === "function") {
-          this.audioDeafened = this.VoiceStateStore.isSelfDeaf();
-        }
-      } catch (e) {
-        console.warn("[ArduinoMute] Error reading state from VoiceStateStore:", e);
-      }
-    }
+    const modules = [this.VoiceStateStore, this.VoiceActions];
     
-    // Fallback: read state from VoiceActions
-    if (this.VoiceActions) {
+    for (const module of modules) {
+      if (!module) continue;
+      
       try {
-        if (typeof this.VoiceActions.isSelfMute === "function") {
-          this.micMuted = this.VoiceActions.isSelfMute();
+        if (typeof module.isSelfMute === "function") {
+          this.micMuted = module.isSelfMute();
         }
-        if (typeof this.VoiceActions.isSelfDeaf === "function") {
-          this.audioDeafened = this.VoiceActions.isSelfDeaf();
+        if (typeof module.isSelfDeaf === "function") {
+          this.audioDeafened = module.isSelfDeaf();
+        }
+        if (this.micMuted !== undefined || this.audioDeafened !== undefined) {
+          return;
         }
       } catch (e) {
-        console.warn("[ArduinoMute] Error reading state from VoiceActions:", e);
+        console.warn("[ArduinoMute] Error reading state:", e);
       }
     }
   }
 
   findVoiceActions() {
-    // Try to find complete module with all functions
-    let module = BdApi.Webpack.getModule(
-      m => typeof m.toggleSelfMute === "function" && typeof m.toggleSelfDeaf === "function" && typeof m.isSelfMute === "function"
-    );
-    if (module) {
-      console.log("[ArduinoMute] VoiceActions found (complete module)");
-      return module;
-    }
-
-    // Fallback: search for toggleSelfDeaf only
-    module = BdApi.Webpack.getModule(
-      m => typeof m.toggleSelfDeaf === "function"
-    );
-    if (module) {
-      console.log("[ArduinoMute] VoiceActions found (deafen only)");
-      return module;
-    }
-
-    // Fallback: search for toggleSelfMute (minimum)
-    module = BdApi.Webpack.getModule(
+    const predicates = [
+      m => typeof m.toggleSelfMute === "function" && typeof m.toggleSelfDeaf === "function" && typeof m.isSelfMute === "function",
+      m => typeof m.toggleSelfDeaf === "function",
       m => typeof m.toggleSelfMute === "function"
-    );
-    if (module) {
-      console.log("[ArduinoMute] VoiceActions found (mute only)");
-      return module;
+    ];
+    
+    for (const predicate of predicates) {
+      const module = BdApi.Webpack.getModule(predicate);
+      if (module) {
+        console.log("[ArduinoMute] VoiceActions found");
+        return module;
+      }
     }
 
     console.error("[ArduinoMute] No VoiceActions module found!");
@@ -104,29 +86,23 @@ module.exports = class ArduinoMute {
   }
 
   findVoiceStateStore() {
-    // Search for module with both isSelfMute and isSelfDeaf functions
-    let module = BdApi.Webpack.getModule(
-      m => typeof m.isSelfMute === "function" && typeof m.isSelfDeaf === "function"
-    );
-    if (module) {
-      console.log("[ArduinoMute] VoiceStateStore found");
-      return module;
-    }
-
-    // Fallback: search for isSelfMute only
-    module = BdApi.Webpack.getModule(
+    const predicates = [
+      m => typeof m.isSelfMute === "function" && typeof m.isSelfDeaf === "function",
       m => typeof m.isSelfMute === "function"
-    );
-    if (module) {
-      console.log("[ArduinoMute] VoiceStateStore found (mute only)");
-      return module;
+    ];
+    
+    for (const predicate of predicates) {
+      const module = BdApi.Webpack.getModule(predicate);
+      if (module) {
+        console.log("[ArduinoMute] VoiceStateStore found");
+        return module;
+      }
     }
 
-    // Alternative: use findModuleByProps
     try {
-      module = BdApi.findModuleByProps("isSelfMute", "isSelfDeaf");
+      const module = BdApi.findModuleByProps("isSelfMute", "isSelfDeaf");
       if (module) {
-        console.log("[ArduinoMute] VoiceStateStore found (via props)");
+        console.log("[ArduinoMute] VoiceStateStore found");
         return module;
       }
     } catch (e) {
@@ -172,10 +148,10 @@ module.exports = class ArduinoMute {
   }
 
   attemptReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+    if (this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
       this.reconnectAttempts++;
-      console.log(`[ArduinoMute] Reconnecting ${this.reconnectAttempts}/${this.maxReconnectAttempts}...`);
-      setTimeout(() => this.connectToServer(), this.reconnectDelay);
+      console.log(`[ArduinoMute] Reconnecting ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS}...`);
+      setTimeout(() => this.connectToServer(), this.RECONNECT_DELAY);
     } else {
       console.error("[ArduinoMute] Max reconnection attempts reached");
     }
@@ -214,55 +190,40 @@ module.exports = class ArduinoMute {
     }
   }
 
-  toggleMic() {
+  performToggle(action, label) {
     if (!this.VoiceActions) {
       console.error("[ArduinoMute] VoiceActions not available");
       return;
     }
 
     try {
-      this.VoiceActions.toggleSelfMute();
-
+      if (typeof this.VoiceActions[action] === "function") {
+        this.VoiceActions[action]();
+      } else {
+        console.warn(`[ArduinoMute] ${action} not available`);
+        return;
+      }
+      
       setTimeout(() => {
         try {
           this.updateCurrentState();
-          console.log("[ArduinoMute] Mic toggled:", this.micMuted ? "MUTED" : "UNMUTED");
+          console.log(`[ArduinoMute] ${label} toggled`);
           this.sendStateToServer();
         } catch (e) {
-          console.error("[ArduinoMute] Error reading mute state:", e);
+          console.error(`[ArduinoMute] Error toggling ${label.toLowerCase()}:`, e);
         }
-      }, 100);
+      }, this.STATE_UPDATE_DELAY);
     } catch (e) {
-      console.error("[ArduinoMute] Error toggling mute:", e);
+      console.error(`[ArduinoMute] Error toggling ${label.toLowerCase()}:`, e);
     }
   }
 
-  toggleAudio() {
-    if (!this.VoiceActions) {
-      console.error("[ArduinoMute] VoiceActions not available");
-      return;
-    }
+  toggleMic() {
+    this.performToggle("toggleSelfMute", "Mic");
+  }
 
-    try {
-      if (typeof this.VoiceActions.toggleSelfDeaf === "function") {
-        this.VoiceActions.toggleSelfDeaf();
-        
-        setTimeout(() => {
-          try {
-            this.updateCurrentState();
-            console.log("[ArduinoMute] Audio toggled:", this.audioDeafened ? "DEAFENED" : "UNDEAFENED");
-            this.sendStateToServer();
-          } catch (e) {
-            console.error("[ArduinoMute] Error reading deaf state:", e);
-          }
-        }, 100);
-      } else {
-        console.warn("[ArduinoMute] toggleSelfDeaf not available");
-        return;
-      }
-    } catch (e) {
-      console.error("[ArduinoMute] Error toggling deafen:", e);
-    }
+  toggleAudio() {
+    this.performToggle("toggleSelfDeaf", "Audio");
   }
 
   toggleBoth() {
@@ -272,30 +233,8 @@ module.exports = class ArduinoMute {
     }
 
     console.log("[ArduinoMute] Toggle both mic and audio");
-    
-    try {
-      this.VoiceActions.toggleSelfMute();
-    } catch (e) {
-      console.error("[ArduinoMute] Error toggling mute:", e);
-    }
-
-    try {
-      if (typeof this.VoiceActions.toggleSelfDeaf === "function") {
-        this.VoiceActions.toggleSelfDeaf();
-      }
-    } catch (e) {
-      console.error("[ArduinoMute] Error toggling deafen:", e);
-    }
-
-    setTimeout(() => {
-      try {
-        this.updateCurrentState();
-        console.log(`[ArduinoMute] State after toggle: Mic=${this.micMuted ? "MUTED" : "UNMUTED"}, Audio=${this.audioDeafened ? "DEAFENED" : "UNDEAFENED"}`);
-        this.sendStateToServer();
-      } catch (e) {
-        console.error("[ArduinoMute] Error reading state:", e);
-      }
-    }, 100);
+    this.performToggle("toggleSelfMute", "Mic");
+    this.performToggle("toggleSelfDeaf", "Audio");
   }
 
   sendStateToServer() {

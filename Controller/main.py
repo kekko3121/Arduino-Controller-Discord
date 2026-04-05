@@ -1,5 +1,7 @@
 import asyncio
-from Config.config import setup_logging, APP_CONFIG, SERVER_CONFIG
+import signal
+from typing import List, Optional
+from Config.config import setup_logging, APP_CONFIG
 from ArduinoHandler.AudioHardware import PortScanner, SerialInterface
 from AudioWeb.AudioState import AudioState
 from AudioWeb.CommandBridge import CommandBridge
@@ -7,61 +9,100 @@ from AudioWeb.WebSocket import WebSocket
 
 logger = setup_logging(__name__)
 
-async def main():
-    # 1. Inizializzazione dei componenti base
+# Timing constants
+ARDUINO_CHECK_INTERVAL = 2
+ARDUINO_READ_INTERVAL = APP_CONFIG.get('read_interval', 0.1)
+
+
+async def main() -> None:
+    """
+    Main application entry point orchestrating all system components.
+    
+    Initializes the audio state, serial hardware interface, command bridge,
+    and WebSocket server, then runs three concurrent tasks:
+    - Monitor Arduino connection status
+    - Read and process Arduino input
+    - Start the WebSocket server for Discord plugin communication
+    """
+    # Initialize core components
     state = AudioState()
     serial_hw = SerialInterface()
     
-    # 2. Inizializzazione del "Cervello" (Bridge)
-    # Il bridge ha bisogno di accedere allo stato e all'hardware
+    # Validate hardware initialization
+    if serial_hw is None:
+        logger.error("Failed to initialize serial interface")
+        return
+    
+    # Initialize the command bridge (connects state management to hardware)
     bridge = CommandBridge(state, serial_hw)
     
-    # 3. Inizializzazione del Server WebSocket
-    # Il server ha bisogno del bridge per reagire ai messaggi di Discord
+    # Initialize the WebSocket server (handles Discord plugin communication)
     server = WebSocket(bridge, state)
 
-    logger.info("System started. Starting hardware monitoring...")
+    logger.info("System started. Initializing hardware monitoring and server...")
 
-    # 4. Definizione dei Task concorrenti
-    tasks = [
-        # Task 1: Gestione della connessione fisica e auto-reconnect
-        asyncio.create_task(monitor_arduino_connection(serial_hw)),
-        
-        # Task 2: Lettura dei dati dall'Arduino e invio al Bridge
-        asyncio.create_task(arduino_read_loop(serial_hw, bridge, server)),
-        
-        # Task 3: Avvio del Server WebSocket per Discord
-        asyncio.create_task(server.start())
+    # Create concurrent tasks for system operations
+    tasks: List[asyncio.Task] = [
+        asyncio.create_task(
+            monitor_arduino_connection(serial_hw),
+            name="arduino_monitor"
+        ),
+        asyncio.create_task(
+            arduino_read_loop(serial_hw, bridge, server),
+            name="arduino_reader"
+        ),
+        asyncio.create_task(
+            server.start(),
+            name="websocket_server"
+        ),
     ]
 
     try:
-        # Esegue tutti i task finché uno non fallisce o viene interrotto
+        # Run all tasks concurrently until one fails or is cancelled
         await asyncio.gather(*tasks)
     except asyncio.CancelledError:
-        logger.info("Tasks interrupted.")
+        logger.info("System shutdown initiated.")
     except Exception as e:
-        logger.error(f"Errore nei task: {e}", exc_info=True)
+        logger.error(f"Unexpected error in task execution: {e}", exc_info=True)
     finally:
-        # Cleanup: cancella i task e chiude la connessione seriale
+        # Cleanup: cancel all pending tasks and close hardware connections
         for task in tasks:
             if not task.done():
                 task.cancel()
+        
+        # Wait for all tasks to complete cancellation
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Close serial connection and release resources
         serial_hw.close()
-        logger.info("Serial connection closed. Program terminated.")
+        logger.info("Hardware connection closed. Application terminated.")
 
-async def monitor_arduino_connection(hw):
-    """Ciclo infinito che controlla se l'Arduino è collegato"""
+async def monitor_arduino_connection(hw: SerialInterface) -> None:
+    """
+    Monitor Arduino hardware connection status and auto-reconnect on disconnection.
+    
+    Periodically checks if the Arduino is connected and attempts to reconnect
+    if the connection is lost. Uses PortScanner to locate the Arduino on available ports.
+    
+    Args:
+        hw: The SerialInterface instance managing hardware communication
+    """
     while True:
-        if not hw.is_connected():
-            port = PortScanner.find_arduino()
-            if port:
-                if hw.open(port):
-                    logger.info(f"Arduino connected on {port}")
+        try:
+            if not hw.is_connected():
+                port = PortScanner.find_arduino()
+                if port:
+                    if hw.open(port):
+                        logger.info(f"Arduino reconnected at port {port}")
+                    else:
+                        logger.warning(f"Failed to open port {port}")
                 else:
-                    logger.error(f"Failed to open port {port}")
-            else:
-                logger.debug("Waiting for Arduino...")
-        await asyncio.sleep(2) # Controlla ogni 2 secondi
+                    logger.debug("Arduino not detected. Retrying...")
+            
+            await asyncio.sleep(ARDUINO_CHECK_INTERVAL)
+        except Exception as e:
+            logger.error(f"Error monitoring Arduino connection: {e}", exc_info=True)
+            await asyncio.sleep(ARDUINO_CHECK_INTERVAL)
 
 async def arduino_read_loop(hw, bridge, server):
     """Legge i dati seriali e li distribuisce"""
