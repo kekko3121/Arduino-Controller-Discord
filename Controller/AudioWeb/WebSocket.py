@@ -53,6 +53,12 @@ class WebSocket:
                         await self.state.update(muted, deafened)
                         self.bridge.arduino.send_commands(self.bridge.get_arduino_led_commands(muted, deafened))
                         await self.broadcast({'type': 'state', 'muted': muted, 'deafened': deafened})
+                    elif data.get('type') == 'sync_leds':
+                        # Handle LED sync from Discord plugin (when user mutes/unmutes via mouse)
+                        mic_led = data.get('mic_led', False)
+                        audio_led = data.get('audio_led', False)
+                        logger.info(f"Syncing LEDs - Mic: {mic_led}, Audio: {audio_led}")
+                        self.bridge.arduino.send_commands(self.bridge.get_arduino_led_commands(mic_led, audio_led))
                 except json.JSONDecodeError:
                     logger.error(f"Invalid JSON message")
                 except Exception as e:
